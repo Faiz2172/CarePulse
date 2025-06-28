@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, db } from '../firebase/config';
-import { doc, getDoc } from "firebase/firestore";
+import { useSignIn, useAuth } from '@clerk/clerk-react';
 
 function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -11,17 +9,16 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  
+  const { signIn, isLoaded: signInLoaded } = useSignIn();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
 
   // Check if user is already logged in
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        navigate('/');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
+    if (authLoaded && isSignedIn) {
+      navigate('/');
+    }
+  }, [authLoaded, isSignedIn, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -29,11 +26,22 @@ function Login() {
     setError('');
     
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // Navigation will be handled by the useEffect hook
+      if (!signInLoaded) return;
+      
+      const result = await signIn.create({
+        identifier: email,
+        password: password,
+      });
+
+      if (result.status === 'complete') {
+        // Navigation will be handled by the useEffect hook
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } catch (error) {
       console.error("Login error:", error);
       setError('Invalid email or password');
+    } finally {
       setLoading(false);
     }
   };
@@ -43,17 +51,15 @@ function Login() {
     setError('');
     
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      if (!signInLoaded) return;
       
-      if (!userDoc.exists()) {
-        await auth.signOut();
-        setError('Please register first before using Google Sign-In');
-        setLoading(false);
-        return;
-      }
+      const result = await signIn.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: '/',
+        redirectUrlComplete: '/',
+      });
       
-      // Navigation will be handled by the useEffect hook
+      // The redirect will handle the authentication flow
     } catch (error) {
       console.error("Google login error:", error);
       setError('Google sign-in failed');

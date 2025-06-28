@@ -1,16 +1,14 @@
-
 import { Navigate } from 'react-router-dom';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase/config';
+import { useAuth } from '@clerk/clerk-react';
 
 const ProtectedRoute = ({ children }) => {
-  const [user, loading] = useAuthState(auth);
+  const { isLoaded, isSignedIn } = useAuth();
 
-  if (loading) {
+  if (!isLoaded) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
-  if (!user) {
+  if (!isSignedIn) {
     return <Navigate to="/login" />;
   }
 

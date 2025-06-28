@@ -1,10 +1,9 @@
-import  { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, doc, where, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth } from '../firebase/config';
-import { Sparkles, Clock, Heart, MessageCircle, Search, X, Share2 } from 'lucide-react';
+import { firestore } from '../firebase/config';
+import { useAuth } from '@clerk/clerk-react';
+import { Sparkles, Clock, Heart, MessageCircle, Search, X, Share2, Plus, Edit, Trash2 } from 'lucide-react';
 
 // Modal Component for Full Blog Post
 const BlogModal = ({ post, onClose }) => {
@@ -95,67 +94,210 @@ const BlogModal = ({ post, onClose }) => {
   );
 };
 
+// Add New Blog Modal Component
+const AddBlogModal = ({ isOpen, onClose, onSubmit, loading }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: 'general'
+  });
+  const [image, setImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImage(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({ ...formData, image });
+    setFormData({ title: '', content: '', category: 'general' });
+    setImage(null);
+    setPreviewUrl(null);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          className="bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 p-6 flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-white">Create New Blog Post</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Enter your blog title..."
+                  className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Category
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                >
+                  <option value="general">General</option>
+                  <option value="health">Health & Wellness</option>
+                  <option value="technology">Technology</option>
+                  <option value="lifestyle">Lifestyle</option>
+                  <option value="personal">Personal Story</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Content
+                </label>
+                <textarea
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  placeholder="Write your blog content..."
+                  className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 h-40 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Featured Image (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  id="blog-image-upload"
+                />
+                <label
+                  htmlFor="blog-image-upload"
+                  className="block w-full text-center py-4 px-4 rounded-lg border-2 border-dashed border-gray-600 hover:border-yellow-400 cursor-pointer transition duration-300"
+                >
+                  <Sparkles className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
+                  <span className="text-gray-400">Click to upload an image</span>
+                </label>
+                {previewUrl && (
+                  <div className="relative mt-4">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewUrl(null);
+                        setImage(null);
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-600 transition duration-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white py-3 rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition duration-300 disabled:opacity-50"
+                >
+                  {loading ? 'Publishing...' : 'Publish Blog'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const Blog = () => {
   const [posts, setPosts] = useState([]);
-  const [newPost, setNewPost] = useState({ title: '', content: '', image: null });
   const [loading, setLoading] = useState(true);
-  const [user] = useAuthState(auth);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const { isSignedIn, isLoaded, user } = useAuth();
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredPosts, setFilteredPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const maxPreviewLength = 150;
+
   // Cloudinary credentials
   const CLOUDINARY_UPLOAD_PRESET = 'KahaniAI';
   const CLOUDINARY_CLOUD_NAME = 'dqsixqhky';
 
   useEffect(() => {
-    if (user) {
-      fetchPosts();
-    } else {
-      fetchPostsWithoutUser();
-    }
-  }, [sortBy, user]);
+    fetchPosts();
+  }, [sortBy, selectedCategory]);
 
   useEffect(() => {
-    const filtered = posts.filter(post => 
-      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.content.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filtered = posts.filter(post => {
+      const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           post.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
     setFilteredPosts(filtered);
-  }, [searchQuery, posts]);
-
-  const fetchPostsWithoutUser = async () => {
-    try {
-      let q;
-      if (sortBy === 'newest') {
-        q = query(collection(db, 'blog_posts'), orderBy('createdAt', 'desc'));
-      } else {
-        q = query(collection(db, 'blog_posts'), orderBy('likes', 'desc'));
-      }
-      
-      const querySnapshot = await getDocs(q);
-      const fetchedPosts = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        isLiked: false
-      }));
-      setPosts(fetchedPosts);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-      setLoading(false);
-    }
-  };
+  }, [searchQuery, posts, selectedCategory]);
 
   const fetchPosts = async () => {
     try {
+      setLoading(true);
       let q;
       if (sortBy === 'newest') {
-        q = query(collection(db, 'blog_posts'), orderBy('createdAt', 'desc'));
+        q = query(collection(firestore, 'blog_posts'), orderBy('createdAt', 'desc'));
       } else {
-        q = query(collection(db, 'blog_posts'), orderBy('likes', 'desc'));
+        q = query(collection(firestore, 'blog_posts'), orderBy('likes', 'desc'));
       }
       
       const querySnapshot = await getDocs(q);
@@ -163,10 +305,10 @@ const Blog = () => {
         const postData = doc.data();
         let isLiked = false;
         
-        if (user) {
+        if (isSignedIn && user) {
           const likesQuery = query(
-            collection(db, 'blog_posts', doc.id, 'likes'),
-            where('userId', '==', user.uid)
+            collection(firestore, 'blog_posts', doc.id, 'likes'),
+            where('userId', '==', user.id)
           );
           const likeSnapshot = await getDocs(likesQuery);
           isLiked = !likeSnapshot.empty;
@@ -181,27 +323,27 @@ const Blog = () => {
       }));
       
       setPosts(fetchedPosts);
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching posts:', error);
+    } finally {
       setLoading(false);
     }
   };
 
   const handleLike = async (postId) => {
-    if (!user) {
+    if (!isSignedIn) {
       alert('Please login to like posts');
       return;
     }
 
     try {
-      const postRef = doc(db, 'blog_posts', postId);
+      const postRef = doc(firestore, 'blog_posts', postId);
       const post = posts.find(p => p.id === postId);
       const likesCollectionRef = collection(postRef, 'likes');
       
       if (post.isLiked) {
         // Unlike the post
-        const likeQuery = query(likesCollectionRef, where('userId', '==', user.uid));
+        const likeQuery = query(likesCollectionRef, where('userId', '==', user.id));
         const likeSnapshot = await getDocs(likeQuery);
         
         if (!likeSnapshot.empty) {
@@ -209,7 +351,7 @@ const Blog = () => {
         }
         
         await updateDoc(postRef, {
-          likes: Math.max((post.likes || 0) - 1, 0) // Ensure likes don't go below 0
+          likes: Math.max((post.likes || 0) - 1, 0)
         });
 
         setPosts(posts.map(p => 
@@ -220,7 +362,7 @@ const Blog = () => {
       } else {
         // Like the post
         await addDoc(likesCollectionRef, {
-          userId: user.uid,
+          userId: user.id,
           createdAt: serverTimestamp()
         });
 
@@ -236,15 +378,6 @@ const Blog = () => {
       }
     } catch (error) {
       console.error('Error updating like:', error);
-    }
-  };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setNewPost({ ...newPost, image: file });
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
     }
   };
 
@@ -269,44 +402,63 @@ const Blog = () => {
     }
   };
 
-  
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!user) return;
+  const handleCreateBlog = async (blogData) => {
+    if (!isSignedIn) {
+      alert('Please login to create a blog post');
+      return;
+    }
 
     try {
       setLoading(true);
       let imageUrl = '';
 
-      if (newPost.image) {
-        imageUrl = await uploadImageToCloudinary(newPost.image);
+      if (blogData.image) {
+        imageUrl = await uploadImageToCloudinary(blogData.image);
       }
 
-      await addDoc(collection(db, 'blog_posts'), {
-        title: newPost.title,
-        content: newPost.content,
+      await addDoc(collection(firestore, 'blog_posts'), {
+        title: blogData.title,
+        content: blogData.content,
+        category: blogData.category,
         imageUrl,
-        author: user.displayName || user.email,
-        authorId: user.uid,
+        author: user?.fullName || user?.emailAddresses?.[0]?.emailAddress || 'Anonymous',
+        authorId: user?.id,
         createdAt: serverTimestamp(),
         likes: 0,
         comments: []
       });
 
-      setNewPost({ title: '', content: '', image: null });
-      setPreviewUrl(null);
+      setIsAddModalOpen(false);
       fetchPosts();
     } catch (error) {
-      console.error('Error creating post:', error);
+      console.error('Error creating blog post:', error);
+      alert('Error creating blog post. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
   const truncateContent = (content) => {
     if (content.length <= maxPreviewLength) return content;
     return content.substring(0, maxPreviewLength) + '...';
   };
+
+  const categories = [
+    { value: 'all', label: 'All Categories' },
+    { value: 'general', label: 'General' },
+    { value: 'health', label: 'Health & Wellness' },
+    { value: 'technology', label: 'Technology' },
+    { value: 'lifestyle', label: 'Lifestyle' },
+    { value: 'personal', label: 'Personal Story' }
+  ];
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-[#0a0b1d] flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0b1d] py-20 px-4 sm:px-6 lg:px-8">
@@ -324,168 +476,159 @@ const Blog = () => {
         </p>
       </motion.div>
 
-{/* Search and Sort Controls */}
-<div className="max-w-7xl mx-auto mb-8 flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Search stories..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
-          />
+      {/* Controls Section */}
+      <div className="max-w-7xl mx-auto mb-8 space-y-4">
+        {/* Search and Sort Controls */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search stories..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          >
+            <option value="newest">Newest First</option>
+            <option value="mostLiked">Most Liked</option>
+          </select>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          >
+            {categories.map(category => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
+          </select>
         </div>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-4 py-2 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
-        >
-          <option value="newest">Newest First</option>
-          <option value="mostLiked">Most Liked</option>
-        </select>
+
+        {/* Add New Blog Button */}
+        {isSignedIn && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-6 py-3 rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition duration-300 flex items-center space-x-2"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add New Blog</span>
+          </motion.button>
+        )}
       </div>
-
-
-      {/* Create Post Section (Only for logged-in users) */}
-      {user && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="max-w-2xl mx-auto mb-16 bg-gray-900/50 p-6 rounded-xl border border-gray-800"
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <input
-                type="text"
-                value={newPost.title}
-                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                placeholder="Your story title..."
-                className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                required
-              />
-            </div>
-            <div>
-              <textarea
-                value={newPost.content}
-                onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                placeholder="Share your story..."
-                className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 h-32 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                required
-              />
-            </div>
-            <div className="space-y-4">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-                id="image-upload"
-              />
-              <label
-                htmlFor="image-upload"
-                className="block w-full text-center py-3 px-4 rounded-lg border-2 border-dashed border-gray-600 hover:border-yellow-400 cursor-pointer transition duration-300"
-              >
-                <Sparkles className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
-                <span className="text-gray-400">Add an image to your story</span>
-              </label>
-              {previewUrl && (
-                <div className="relative">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="w-full h-48 object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewUrl(null);
-                      setNewPost({ ...newPost, image: null });
-                    }}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-900 to-blue-700 text-white py-3 rounded-lg hover:from-blue-800 hover:to-blue-600 transition duration-300"
-            >
-              {loading ? 'Publishing...' : 'Share Your Story'}
-            </button>
-          </form>
-        </motion.div>
-      )}
 
       {/* Posts Grid */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {(searchQuery ? filteredPosts : posts).map((post) => (
-          <motion.article
-            key={post.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-900/30 rounded-xl overflow-hidden border border-gray-800 hover:border-yellow-400/50 transition duration-300"
-          >
-            {post.imageUrl && (
-              <div 
-                className="aspect-video w-full overflow-hidden cursor-pointer"
-                onClick={() => setSelectedPost(post)}
-              >
-                <img
-                  src={post.imageUrl}
-                  alt={post.title}
-                  className="w-full h-full object-cover transition duration-300 hover:scale-105"
-                />
-              </div>
-            )}
-            <div className="p-6">
-              <h2 
-                className="text-xl font-bold text-white mb-3 cursor-pointer hover:text-yellow-400 transition-colors"
-                onClick={() => setSelectedPost(post)}
-              >
-                {post.title}
-              </h2>
-              <div className="text-gray-400 mb-4">
-                <p>{truncateContent(post.content)}</p>
-                {post.content.length > maxPreviewLength && (
-                  <button
-                    onClick={() => setSelectedPost(post)}
-                    className="text-yellow-400 hover:text-yellow-300 mt-2 font-medium transition-colors"
-                  >
-                    Read More
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center justify-between text-sm text-gray-500">
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-4 h-4" />
-                  <span>
-                    {post.createdAt?.toDate().toLocaleDateString() || 'Just now'}
+      {loading ? (
+        <div className="max-w-7xl mx-auto text-center py-20">
+          <div className="text-white text-xl">Loading posts...</div>
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {(searchQuery || selectedCategory !== 'all' ? filteredPosts : posts).map((post) => (
+            <motion.article
+              key={post.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gray-900/30 rounded-xl overflow-hidden border border-gray-800 hover:border-yellow-400/50 transition duration-300"
+            >
+              {post.imageUrl && (
+                <div 
+                  className="aspect-video w-full overflow-hidden cursor-pointer"
+                  onClick={() => setSelectedPost(post)}
+                >
+                  <img
+                    src={post.imageUrl}
+                    alt={post.title}
+                    className="w-full h-full object-cover transition duration-300 hover:scale-105"
+                  />
+                </div>
+              )}
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+                    {post.category || 'general'}
                   </span>
+                  {isSignedIn && user?.id === post.authorId && (
+                    <div className="flex space-x-2">
+                      <button className="text-gray-400 hover:text-blue-400 transition-colors">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button className="text-gray-400 hover:text-red-400 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center space-x-4">
-                  <button 
-                    onClick={() => handleLike(post.id)}
-                    className={`flex items-center space-x-1 ${
-                      post.isLiked ? 'text-red-500' : 'text-gray-400'
-                    } hover:text-red-500 transition-colors duration-200`}
-                  >
-                    <Heart className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
-                    <span>{post.likes || 0}</span>
-                  </button>
-                  <button className="flex items-center space-x-1 text-gray-400 hover:text-yellow-400">
-                    <MessageCircle className="w-4 h-4" />
-                    <span>{post.comments?.length || 0}</span>
-                  </button>
+                <h2 
+                  className="text-xl font-bold text-white mb-3 cursor-pointer hover:text-yellow-400 transition-colors"
+                  onClick={() => setSelectedPost(post)}
+                >
+                  {post.title}
+                </h2>
+                <div className="text-gray-400 mb-4">
+                  <p>{truncateContent(post.content)}</p>
+                  {post.content.length > maxPreviewLength && (
+                    <button
+                      onClick={() => setSelectedPost(post)}
+                      className="text-yellow-400 hover:text-yellow-300 mt-2 font-medium transition-colors"
+                    >
+                      Read More
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4" />
+                    <span>
+                      {post.createdAt?.toDate().toLocaleDateString() || 'Just now'}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <button 
+                      onClick={() => handleLike(post.id)}
+                      className={`flex items-center space-x-1 ${
+                        post.isLiked ? 'text-red-500' : 'text-gray-400'
+                      } hover:text-red-500 transition-colors duration-200`}
+                    >
+                      <Heart className={`w-4 h-4 ${post.isLiked ? 'fill-current' : ''}`} />
+                      <span>{post.likes || 0}</span>
+                    </button>
+                    <button className="flex items-center space-x-1 text-gray-400 hover:text-yellow-400">
+                      <MessageCircle className="w-4 h-4" />
+                      <span>{post.comments?.length || 0}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.article>
-        ))}
-      </div>
+            </motion.article>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && (searchQuery || selectedCategory !== 'all' ? filteredPosts : posts).length === 0 && (
+        <div className="max-w-7xl mx-auto text-center py-20">
+          <div className="text-gray-400 text-xl">
+            {searchQuery ? 'No posts found matching your search.' : 'No blog posts yet.'}
+          </div>
+          {isSignedIn && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="mt-4 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-6 py-3 rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition duration-300"
+            >
+              Create the first blog post!
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Blog Post Modal */}
       {selectedPost && (
@@ -494,6 +637,14 @@ const Blog = () => {
           onClose={() => setSelectedPost(null)}
         />
       )}
+
+      {/* Add New Blog Modal */}
+      <AddBlogModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSubmit={handleCreateBlog}
+        loading={loading}
+      />
     </div>
   );
 };

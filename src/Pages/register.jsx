@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { auth, googleProvider, db } from "../firebase/config";
-import { doc, setDoc } from "firebase/firestore";
+import { useSignUp, useAuth } from '@clerk/clerk-react';
 import PhoneVerification from "../Components/PhoneVerification"; // Ensure this component exists
 
 export const Register = () => {
@@ -19,16 +17,15 @@ export const Register = () => {
   const [step, setStep] = useState(1);
   const [phoneVerified, setPhoneVerified] = useState(false);
 
+  const { signUp, isLoaded: signUpLoaded } = useSignUp();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+
   // Check if user is already logged in
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        navigate('/');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
+    if (authLoaded && isSignedIn) {
+      navigate('/');
+    }
+  }, [authLoaded, isSignedIn, navigate]);
 
   // Step 1: Validate and move to phone verification
   const handleInitialSubmit = async (e) => {
@@ -52,20 +49,25 @@ export const Register = () => {
     setLoading(true);
     
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (!signUpLoaded) return;
       
-      // Create user document in Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        name,
-        email,
-        phone,
-        createdAt: new Date()
+      const result = await signUp.create({
+        emailAddress: email,
+        password: password,
+        firstName: name.split(' ')[0] || name,
+        lastName: name.split(' ').slice(1).join(' ') || '',
+        phoneNumber: phone,
       });
-      
-      // Navigation will be handled by the useEffect hook
+
+      if (result.status === 'complete') {
+        // Navigation will be handled by the useEffect hook
+      } else {
+        setError('Registration failed. Please try again.');
+      }
     } catch (error) {
       console.error("Registration error:", error);
-      setError(error.message);
+      setError(error.message || 'Registration failed');
+    } finally {
       setLoading(false);
     }
   };
@@ -76,17 +78,15 @@ export const Register = () => {
     setError("");
     
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      if (!signUpLoaded) return;
       
-      // Create user document in Firestore if it doesn't exist
-      await setDoc(doc(db, 'users', result.user.uid), {
-        name: result.user.displayName || '',
-        email: result.user.email || '',
-        phone: '',
-        createdAt: new Date()
-      }, { merge: true });
+      const result = await signUp.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: '/',
+        redirectUrlComplete: '/',
+      });
       
-      // Navigation will be handled by the useEffect hook
+      // The redirect will handle the authentication flow
     } catch (error) {
       console.error("Google registration error:", error);
       setError("Google sign-up failed");

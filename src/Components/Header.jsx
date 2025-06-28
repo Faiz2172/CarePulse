@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, User } from "lucide-react";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "../firebase/config";
+import { useAuth, useClerk } from "@clerk/clerk-react";
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const [user, loading] = useAuthState(auth);
+  const { isSignedIn, isLoaded, user } = useAuth();
+  const { signOut } = useClerk();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,7 +22,7 @@ const Header = () => {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await signOut();
       navigate('/login');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -78,12 +78,13 @@ const Header = () => {
 
         {/* Logout and Profile Button */}
         <div className="hidden md:flex items-center space-x-4">
-          {loading ? (
+          {!isLoaded ? (
             <span className="text-white opacity-70">Loading...</span>
-          ) : user ? (
+          ) : isSignedIn ? (
             <div className="flex items-center space-x-4">
               <Link 
                 to="/dashboard" 
+                
                 className="flex items-center text-white hover:text-yellow-400 transition duration-300"
               >
                 <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
@@ -139,9 +140,9 @@ const Header = () => {
           <NavLink to="/face-recognition" onClick={() => setMenuOpen(false)} isActive={location.pathname === "/face-recognition"}>
             Face Recognition
           </NavLink>
-          {loading ? (
+          {!isLoaded ? (
             <span className="text-white opacity-70">Loading...</span>
-          ) : user ? (
+          ) : isSignedIn ? (
             <div className="flex flex-col space-y-4">
               <NavLink to="/dashboard" onClick={() => setMenuOpen(false)} isActive={location.pathname === "/dashboard"}>
                 <div className="flex items-center space-x-2">

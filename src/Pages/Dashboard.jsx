@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth, firestore } from "../firebase/config";
+import { useAuth } from "@clerk/clerk-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { firestore } from "../firebase/config";
 import { 
   Activity, Heart, Clock, Calendar, Bell, 
   User, PlusCircle, Settings, PieChart,
@@ -15,7 +15,7 @@ import HealthSummary from "../Components/HealthSummary";
 import GoogleFitConnect from "../Components/GoogleFitConnect";
 
 const Dashboard = () => {
-  const [user, loading] = useAuthState(auth);
+  const { isSignedIn, isLoaded, user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [userData, setUserData] = useState(null);
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
@@ -23,8 +23,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (user) {
-        const userRef = doc(firestore, "users", user.uid);
+      if (isSignedIn && user) {
+        const userRef = doc(firestore, "users", user.id);
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
@@ -34,9 +34,9 @@ const Dashboard = () => {
         } else {
           // Create user profile if it doesn't exist
           const newUserData = {
-            displayName: user.displayName || "",
-            email: user.email,
-            photoURL: user.photoURL || "",
+            displayName: user.fullName || user.firstName || "",
+            email: user.primaryEmailAddress?.emailAddress || "",
+            photoURL: user.imageUrl || "",
             googleFitConnected: false,
             connectedDevices: [],
             createdAt: new Date()
@@ -47,12 +47,12 @@ const Dashboard = () => {
       }
     };
 
-    if (!loading && user) {
+    if (isLoaded && isSignedIn) {
       fetchUserData();
     }
-  }, [user, loading]);
+  }, [isSignedIn, isLoaded, user]);
 
-  if (loading) {
+  if (!isLoaded) {
     return (
       <div className="container mx-auto mt-24 p-4 flex justify-center items-center h-screen">
         <div className="animate-pulse flex flex-col items-center">
@@ -64,7 +64,7 @@ const Dashboard = () => {
     );
   }
 
-  if (!user) {
+  if (!isSignedIn) {
     return (
       <div className="container mx-auto mt-24 p-4 flex justify-center items-center h-screen">
         <div className="text-center">
@@ -88,21 +88,22 @@ const Dashboard = () => {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-4 mb-4 md:mb-0">
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                {user.photoURL ? (
+                {user?.imageUrl ? (
                   <img 
-                    src={user.photoURL} 
+                    src={user.imageUrl} 
                     alt="Profile" 
                     className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
                   <span className="text-2xl font-bold text-yellow-500">
-                    {user.displayName ? user.displayName[0].toUpperCase() : user.email[0].toUpperCase()}
+                    {user?.firstName ? user.firstName[0].toUpperCase() : 
+                     user?.primaryEmailAddress?.emailAddress ? user.primaryEmailAddress.emailAddress[0].toUpperCase() : 'U'}
                   </span>
                 )}
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">
-                  Welcome, {user.displayName || user.email.split('@')[0]}
+                  Welcome, {user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress?.split('@')[0]}
                 </h1>
                 <p className="text-yellow-100">Track your health with CarePulse</p>
               </div>
@@ -180,7 +181,7 @@ const Dashboard = () => {
               </div>
               <GoogleFitConnect 
                 onConnect={() => setIsGoogleFitConnected(true)} 
-                userId={user.uid}
+                userId={user?.id}
               />
             </div>
           </div>
@@ -193,7 +194,7 @@ const Dashboard = () => {
               <HealthSummary isGoogleFitConnected={isGoogleFitConnected} />
               <HeartRateWidget isGoogleFitConnected={isGoogleFitConnected} />
               <MedicationReminders 
-                userId={user.uid} 
+                userId={user?.id} 
                 limit={3} 
                 showAddButton={true} 
               />
@@ -201,43 +202,68 @@ const Dashboard = () => {
           )}
 
           {activeTab === "health" && (
-            <HeartRateWidget 
-              isGoogleFitConnected={isGoogleFitConnected} 
-              fullWidth={true} 
-            />
+            <>
+              <HeartRateWidget isGoogleFitConnected={isGoogleFitConnected} />
+              <div className="md:col-span-2">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-md">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Heart className="mr-2 text-red-500" />
+                    Heart Rate History
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Detailed heart rate monitoring and trends will be displayed here.
+                  </p>
+                </div>
+              </div>
+            </>
           )}
 
           {activeTab === "stress" && (
-            <StressLevelWidget 
-              isGoogleFitConnected={isGoogleFitConnected} 
-              fullWidth={true} 
-            />
+            <>
+              <StressLevelWidget isGoogleFitConnected={isGoogleFitConnected} />
+              <div className="md:col-span-2">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-md">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Activity className="mr-2 text-orange-500" />
+                    Stress Level Analysis
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Stress level tracking and recommendations will be displayed here.
+                  </p>
+                </div>
+              </div>
+            </>
           )}
 
           {activeTab === "medications" && (
-            <MedicationReminders 
-              userId={user.uid} 
-              fullWidth={true} 
-            />
+            <div className="md:col-span-3">
+              <MedicationReminders 
+                userId={user?.id} 
+                limit={10} 
+                showAddButton={true} 
+              />
+            </div>
           )}
 
           {activeTab === "devices" && (
-            <DeviceConnector 
-              userId={user.uid} 
-              connectedDevices={connectedDevices}
-              setConnectedDevices={setConnectedDevices}
-              fullWidth={true} 
-            />
+            <div className="md:col-span-3">
+              <DeviceConnector 
+                userId={user?.id}
+                connectedDevices={connectedDevices}
+                onDeviceUpdate={setConnectedDevices}
+              />
+            </div>
           )}
 
           {activeTab === "stats" && (
-            <div className="col-span-full">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold mb-4">Health Statistics</h2>
-                <p className="text-gray-600 dark:text-gray-300">
-                  {isGoogleFitConnected 
-                    ? "Your detailed health statistics from Google Fit will appear here." 
-                    : "Connect Google Fit to see your detailed health statistics."}
+            <div className="md:col-span-3">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-md">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <BarChart2 className="mr-2 text-blue-500" />
+                  Health Statistics
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Comprehensive health statistics and analytics will be displayed here.
                 </p>
               </div>
             </div>
@@ -252,10 +278,10 @@ const TabButton = ({ active, onClick, icon, label }) => {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition duration-300 ${
+      className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition duration-300 ${
         active
           ? "bg-yellow-500 text-white shadow-md"
-          : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-yellow-100 dark:hover:bg-gray-700"
+          : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-yellow-50 dark:hover:bg-gray-700"
       }`}
     >
       {icon}
