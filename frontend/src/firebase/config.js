@@ -7,13 +7,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDjtulHJBlsD8sCH6X_mIltipNzurpeH_o",
-    authDomain: "kahaniai.firebaseapp.com",
-    projectId: "kahaniai",
-    storageBucket: "kahaniai.firebasestorage.app",
-    messagingSenderId: "683320930030",
-    appId: "1:683320930030:web:7833d8f87fa6b923c4cdff",
-    measurementId: "G-7M0TZDNJY6"
+  apiKey: "AIzaSyA38UJiJBRMfbAGl017Q4MjnwSng-wDaEM",
+  authDomain: "mediconnect-69ad7.firebaseapp.com",
+  projectId: "mediconnect-69ad7",
+  storageBucket: "mediconnect-69ad7.firebasestorage.app",
+  messagingSenderId: "677064114893",
+  appId: "1:677064114893:web:882a57f0a4d1b1da1edf84",
+  measurementId: "G-65K7Q8JVBY"
 };
 
 // Initialize Firebase
