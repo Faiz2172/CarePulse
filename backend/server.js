@@ -6,6 +6,7 @@ import { ENV } from "./src/config/env.js";
 import { db } from "./src/config/database.js";
 import blogRoutes from "./src/routes/blogs.js";
 import job from "./src/config/cron.js";
+import appointmentsRouter from './../backend/src/routes/appointments.js' ;
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -106,6 +107,7 @@ app.post('/api/send-emergency-alert', async (req, res) => {
 
 // API Routes
 app.use('/api/blogs', blogRoutes);
+app.use("/api/appointments", appointmentsRouter);
 
 // Global error handler
 app.use((error, req, res, next) => {

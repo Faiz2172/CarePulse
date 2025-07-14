@@ -19,6 +19,7 @@ import StoryFeedback from "./Pages/Feedback";
 import Dashboard from "./Pages/Dashboard";
 import AccidentDetection from "./Pages/AccidentDetection";
 import FaceRecognition from "./Pages/FaceRecognition";
+import Appointments from "./Pages/Appointments";
 
 // Import the new VideoCall page
 import VideoCall from "./Pages/VideoCall";
@@ -71,14 +72,16 @@ const App = () => {
                 path="/dashboard" 
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <Dashboard/>
                   </ProtectedRoute>
                 } 
               />
+                         
               <Route path="/accident-detection" element={<AccidentDetection />} />
               <Route path="/face-recognition" element={<FaceRecognition />} />
               {/* New route for video call */}
               <Route path="/video-call" element={<VideoCall />} />
+              <Route path="/appointments" element={<Appointments/>}/>
             </Routes>
             <Footer />
           </BrowserRouter>

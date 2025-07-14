@@ -53,14 +53,9 @@ const Header = () => {
         <div className="hidden md:flex items-center space-x-6 flex-grow justify-center">
           
           {/* Replace NavLink with <a> for external link */}
-          <a
-            href="http://localhost:3000"
-            className={`text-white hover:text-yellow-400 transition duration-300 ${
-              location.pathname === "/appointments" ? "border-b-2 border-yellow-400" : "border-transparent"
-            }`}
-          >
+          <NavLink to="/appointments" isActive={location.pathname === "/appointments"}>
             Appointments
-          </a>
+          </NavLink>
           <NavLink to="/blog" isActive={location.pathname === "/blog"}>
             Community
           </NavLink>
